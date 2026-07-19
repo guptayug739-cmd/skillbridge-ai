@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /chat
+Disallow: /wallet
+Disallow: /notifications
+Disallow: /saved
+Disallow: /api/
+
+Sitemap: https://skillbridge.ai/sitemap.xml

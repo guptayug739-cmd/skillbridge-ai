@@ -1,0 +1,761 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  FREELANCER
+  CLIENT
+  ADMIN
+}
+
+enum ProjectStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+}
+
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  SHORTLISTED
+}
+
+enum ContractStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum EscrowStatus {
+  FUNDED
+  HELD
+  RELEASED
+  REFUNDED
+  DISPUTED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  PAYMENT
+  REFUND
+  COMMISSION
+  RELEASE
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum NotificationType {
+  PROPOSAL_RECEIVED
+  PROPOSAL_ACCEPTED
+  PROPOSAL_REJECTED
+  PROJECT_STARTED
+  MILESTONE_COMPLETED
+  MILESTONE_APPROVED
+  PAYMENT_RECEIVED
+  PAYMENT_RELEASED
+  NEW_MESSAGE
+  DISPUTE_OPENED
+  DISPUTE_RESOLVED
+  REVIEW_RECEIVED
+  VERIFICATION_COMPLETE
+  ACCOUNT_SUSPENDED
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  phone                String?
+  password             String
+  name                 String
+  avatar               String?
+  role                 UserRole  @default(FREELANCER)
+  dateOfBirth          DateTime?
+  gender               String?
+  isVerified           Boolean   @default(false)
+  isPhoneVerified      Boolean   @default(false)
+  verificationToken    String?
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+  googleId             String?   @unique
+  isActive             Boolean   @default(true)
+  lastLogin            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+  createdBy            String?
+  updatedBy            String?
+
+  freelancer       Freelancer?
+  client           Client?
+  admin            Admin?
+  wallet           Wallet?
+  sentMessages     Message[]         @relation("SentMessages")
+  notifications    Notification[]
+  transactions     Transaction[]
+  withdrawals      Withdrawal[]
+  reviewsGiven     Review[]          @relation("ReviewsGiven")
+  disputes         Dispute[]
+  refreshTokens    RefreshToken[]
+  auditLogs        AuditLog[]
+  savedProjects    SavedProject[]
+  savedFreelancers SavedFreelancer[]
+  Session          Session[]
+  LoginHistory     LoginHistory[]
+
+  @@index([email])
+  @@index([role])
+  @@index([googleId])
+  @@index([deletedAt])
+}
+
+model Freelancer {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  title             String?
+  bio               String?
+  hourlyRate        Float?
+  experienceYears   Int?
+  available         Boolean  @default(true)
+  aiScore           Float?
+  completedProjects Int      @default(0)
+  totalEarnings     Float    @default(0)
+  rating            Float?
+  resumeUrl         String?
+  location          String?
+  addressLine       String?
+  city              String?
+  state             String?
+  pincode           String?
+  country           String   @default("India")
+  languages         String[] @default([])
+  socialLinks       Json     @default("{}")
+
+  identityType        String?
+  identityNumber      String?
+  identityVerified    Boolean @default(false)
+  identityDocumentUrl String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  createdBy String?
+  updatedBy String?
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  proposals  Proposal[]
+  contracts  Contract[]        @relation("FreelancerContracts")
+  portfolios Portfolio[]
+  resumes    Resume[]
+  reviews    Review[]          @relation("FreelancerReviews")
+  aiAnalyses AIAnalysis[]
+  userSkills UserSkill[]
+  education  Education[]
+  savedBy    SavedFreelancer[]
+  invites    Invite[]
+
+  @@index([available])
+  @@index([rating])
+  @@index([aiScore])
+  @@index([deletedAt])
+}
+
+model Education {
+  id           String    @id @default(uuid())
+  freelancerId String
+  degree       String
+  institution  String
+  fieldOfStudy String?
+  startYear    Int?
+  endYear      Int?
+  grade        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  freelancer Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  @@index([freelancerId])
+}
+
+model Client {
+  id                    String             @id @default(uuid())
+  userId                String             @unique
+  companyName           String?
+  companyWebsite        String?
+  companySize           String?
+  industry              String?
+  companyDescription    String?
+  verificationStatus    VerificationStatus @default(PENDING)
+  verificationDocuments String[]
+  totalProjectsPosted   Int                @default(0)
+  totalSpent            Float              @default(0)
+  rating                Float?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  deletedAt             DateTime?
+  createdBy             String?
+  updatedBy             String?
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects  Project[]
+  contracts Contract[] @relation("ClientContracts")
+  invites   Invite[]
+
+  @@index([deletedAt])
+}
+
+model Admin {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  permissions String[]  @default([])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disputes Dispute[] @relation("ResolvedDisputes")
+}
+
+model Skill {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  category  String
+  createdAt DateTime @default(now())
+
+  userSkills    UserSkill[]
+  projectSkills ProjectSkill[]
+
+  @@index([category])
+}
+
+model UserSkill {
+  id           String  @id @default(uuid())
+  freelancerId String
+  skillId      String
+  proficiency  String?
+
+  freelancer Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  skill      Skill      @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([freelancerId, skillId])
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  icon      String?
+  createdAt DateTime @default(now())
+
+  projects Project[]
+}
+
+model Project {
+  id                String        @id @default(uuid())
+  clientId          String
+  title             String
+  description       String
+  categoryId        String
+  budgetMin         Float
+  budgetMax         Float
+  budgetType        String        @default("FIXED")
+  experienceLevel   String        @default("INTERMEDIATE")
+  duration          String
+  status            ProjectStatus @default(OPEN)
+  attachments       String[]
+  proposalsCount    Int           @default(0)
+  hiredFreelancerId String?
+  deadline          DateTime
+  isFeatured        Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  deletedAt         DateTime?
+  createdBy         String?
+  updatedBy         String?
+
+  client            Client             @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category          Category           @relation(fields: [categoryId], references: [id])
+  proposals         Proposal[]
+  contracts         Contract[]
+  savedBy           SavedProject[]
+  invites           Invite[]
+  projectSkills     ProjectSkill[]
+  aiRecommendations AIRecommendation[]
+
+  @@index([status])
+  @@index([clientId])
+  @@index([categoryId])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model ProjectSkill {
+  id        String @id @default(uuid())
+  projectId String
+  skillId   String
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  skill   Skill   @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, skillId])
+}
+
+model Proposal {
+  id           String         @id @default(uuid())
+  projectId    String
+  freelancerId String
+  coverLetter  String
+  bidAmount    Float
+  deliveryTime Int
+  attachments  String[]
+  status       ProposalStatus @default(PENDING)
+  aiScore      Float?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+  createdBy    String?
+  updatedBy    String?
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancer Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, freelancerId])
+  @@index([status])
+  @@index([projectId])
+  @@index([freelancerId])
+  @@index([deletedAt])
+}
+
+model Contract {
+  id               String         @id @default(uuid())
+  projectId        String
+  freelancerId     String
+  clientId         String
+  status           ContractStatus @default(PENDING)
+  budget           Float
+  platformFee      Float
+  freelancerAmount Float
+  startDate        DateTime       @default(now())
+  endDate          DateTime?
+  terms            String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+  createdBy        String?
+  updatedBy        String?
+
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancer    Freelancer     @relation("FreelancerContracts", fields: [freelancerId], references: [id])
+  client        Client         @relation("ClientContracts", fields: [clientId], references: [id])
+  milestones    Milestone[]
+  escrowAccount EscrowAccount?
+  messages      Message[]
+  reviews       Review[]
+  disputes      Dispute[]
+
+  @@index([status])
+  @@index([freelancerId])
+  @@index([clientId])
+  @@index([deletedAt])
+}
+
+model Milestone {
+  id          String          @id @default(uuid())
+  contractId  String
+  title       String
+  description String
+  amount      Float
+  status      MilestoneStatus @default(PENDING)
+  dueDate     DateTime
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@index([status])
+}
+
+model EscrowAccount {
+  id                String       @id @default(uuid())
+  contractId        String       @unique
+  amount            Float
+  platformFee       Float
+  freelancerAmount  Float
+  status            EscrowStatus @default(FUNDED)
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  fundedAt          DateTime?
+  releasedAt        DateTime?
+  refundedAt        DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+}
+
+model Wallet {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  balance        Float    @default(0)
+  lockedBalance  Float    @default(0)
+  totalWithdrawn Float    @default(0)
+  totalEarned    Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id            String          @id @default(uuid())
+  userId        String
+  type          TransactionType
+  amount        Float
+  fee           Float           @default(0)
+  netAmount     Float
+  status        PaymentStatus   @default(PENDING)
+  referenceType String?
+  referenceId   String?
+  description   String
+  razorpayId    String?
+  createdAt     DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Withdrawal {
+  id               String        @id @default(uuid())
+  userId           String
+  amount           Float
+  fee              Float         @default(0)
+  netAmount        Float
+  accountNumber    String
+  ifscCode         String
+  accountHolder    String
+  bankName         String
+  status           PaymentStatus @default(PENDING)
+  razorpayPayoutId String?
+  processedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Message {
+  id          String    @id @default(uuid())
+  contractId  String
+  senderId    String
+  content     String
+  attachments String[]
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  sender   User     @relation("SentMessages", fields: [senderId], references: [id])
+
+  @@index([contractId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  deletedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+model Review {
+  id         String    @id @default(uuid())
+  contractId String
+  reviewerId String
+  revieweeId String
+  rating     Int
+  content    String
+  createdAt  DateTime  @default(now())
+  deletedAt  DateTime?
+
+  contract Contract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  reviewer User       @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  reviewee Freelancer @relation("FreelancerReviews", fields: [revieweeId], references: [id])
+
+  @@unique([contractId, reviewerId])
+  @@index([revieweeId])
+  @@index([rating])
+}
+
+model Dispute {
+  id           String        @id @default(uuid())
+  contractId   String
+  raisedById   String
+  reason       String
+  description  String
+  evidence     String[]
+  status       DisputeStatus @default(OPEN)
+  resolvedById String?
+  resolution   String?
+  createdAt    DateTime      @default(now())
+  resolvedAt   DateTime?
+  deletedAt    DateTime?
+
+  contract   Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  raisedBy   User     @relation(fields: [raisedById], references: [id])
+  resolvedBy Admin?   @relation("ResolvedDisputes", fields: [resolvedById], references: [id])
+
+  @@index([status])
+  @@index([contractId])
+}
+
+model Portfolio {
+  id           String    @id @default(uuid())
+  freelancerId String
+  title        String
+  description  String?
+  imageUrl     String
+  projectUrl   String?
+  tags         String[]  @default([])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  createdBy    String?
+  updatedBy    String?
+
+  freelancer Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  @@index([freelancerId])
+  @@index([deletedAt])
+}
+
+model Resume {
+  id           String    @id @default(uuid())
+  freelancerId String
+  fileUrl      String
+  fileName     String
+  fileSize     Int
+  isPrimary    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  freelancer Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  @@index([freelancerId])
+}
+
+model AIAnalysis {
+  id           String   @id @default(uuid())
+  freelancerId String
+  type         String
+  score        Float?
+  summary      String?
+  details      Json?
+  createdAt    DateTime @default(now())
+
+  freelancer Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  @@index([freelancerId])
+  @@index([type])
+}
+
+model AIRecommendation {
+  id              String   @id @default(uuid())
+  projectId       String
+  freelancerId    String
+  score           Float
+  matchReason     String
+  skillMatch      Float
+  experienceMatch Float
+  ratingScore     Float
+  createdAt       DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([score])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model SavedProject {
+  id        String   @id @default(uuid())
+  userId    String
+  projectId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+}
+
+model SavedFreelancer {
+  id           String   @id @default(uuid())
+  userId       String
+  freelancerId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  freelancer Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, freelancerId])
+}
+
+model Invite {
+  id           String       @id @default(uuid())
+  projectId    String
+  freelancerId String
+  clientId     String
+  message      String?
+  status       InviteStatus @default(PENDING)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancer Freelancer @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  client     Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, freelancerId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  details    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  deviceName   String?
+  deviceType   String?
+  browser      String?
+  os           String?
+  location     String?
+  isActive     Boolean  @default(true)
+  lastActiveAt DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshToken])
+  @@index([isActive])
+}
+
+model LoginHistory {
+  id            String   @id @default(uuid())
+  userId        String
+  email         String
+  success       Boolean
+  ipAddress     String?
+  userAgent     String?
+  deviceName    String?
+  deviceType    String?
+  browser       String?
+  os            String?
+  location      String?
+  failureReason String?
+  createdAt     DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([email])
+  @@index([success])
+  @@index([createdAt])
+}
